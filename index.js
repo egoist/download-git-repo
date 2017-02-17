@@ -30,7 +30,7 @@ function download(repo, dest, opts, fn) {
   if (clone) {
     gitclone(url, dest, { checkout: repo.checkout }, function(err) {
       if (err === undefined) {
-        rm(dest + "/.git");
+        rm(dest);
         fn();
       }
       else {
