@@ -1,86 +1,103 @@
 var path = require("path");
-var Download = require("download");
-var gitclone = require("git-clone");
-var rm = require("rimraf").sync;
+var downloadUrl = require("download")
+var gitclone = require("git-clone")
+var rm = require("rimraf").sync
 
 /**
  * Expose `download`.
  */
 
-module.exports = download;
+module.exports = download
 
 /**
  * Download `repo` to `dest` and callback `fn(err)`.
  *
  * @param {String} repo
  * @param {String} dest
+ * @param {Object} opts
  * @param {Function} fn
  */
 
-function download(repo, dest, opts, fn) {
+function download (repo, dest, opts, fn) {
   if (typeof opts === "function") {
-    fn = opts;
-    opts = null;
+    fn = opts
+    opts = null
   }
-  opts = opts || {};
-  var clone = opts.clone || false;
+  opts = opts || {}
+  var clone = opts.clone || false
 
-  repo = normalize(repo);
-  var url = getUrl(repo, clone);
+  repo = normalize(repo)
+  var url = getUrl(repo, clone)
   
   // Ensure dest directory is empty
   rm(dest);
 
   if (clone) {
-    gitclone(url, dest, { checkout: repo.checkout }, function(err) {
+    gitclone(url, dest, { checkout: repo.checkout }, function (err) {
       if (err === undefined) {
         rm(path.join(dest, '.git'));
         fn();
       }
       else {
-        fn(err);
+        fn(err)
       }
-    });
+    })
   }
   else {
-    new Download({ mode: "666", extract: true, strip: 1 }).get(url).dest(dest).run(function(err, files) {
-      err === null ? fn() : fn(err);
-    });
+    downloadUrl(url, dest, { extract: true, strip: 1, mode: "666", headers: { accept: "application/zip" } }).then(data => {
+      fn()
+    }).catch(err => {
+      fn(err)
+    })
   }
 }
 
 /**
  * Normalize a repo string.
  *
- * @param {String} string
+ * @param {String} repo
  * @return {Object}
  */
 
-function normalize(repo) {
-  var regex = /^((github|gitlab|bitbucket):)?((.+):)?([^/]+)\/([^#]+)(#(.+))?$/;
-  var match = regex.exec(repo);
-  var type = match[2] || "github";
-  var host = match[4] || null;
-  var owner = match[5];
-  var name = match[6];
-  var checkout = match[8] || "master";
+function normalize (repo) {
+  var regex = /^((github|gitlab|bitbucket):)?((.+):)?([^/]+)\/([^#]+)(#(.+))?$/
+  var match = regex.exec(repo)
+  var type = match[2] || "github"
+  var origin = match[4] || null
+  var owner = match[5]
+  var name = match[6]
+  var checkout = match[8] || "master"
 
-  if (host == null) {
+  if (origin == null) {
     if (type === "github")
-      host = "github.com";
+      origin = "github.com"
     else if (type === "gitlab")
-      host = "gitlab.com";
+      origin = "gitlab.com"
     else if (type === "bitbucket")
-      host = "bitbucket.com";
+      origin = "bitbucket.com"
   }
 
   return {
     type: type,
-    host: host,
+    origin: origin,
     owner: owner,
     name: name,
     checkout: checkout
-  };
+  }
+}
+
+/**
+ * Add HTTPs protocol to url in none specified.
+ *
+ * @param {String} url
+ * @return {String}
+ */
+
+function addProtocol (url) {
+  if (!/^(f|ht)tps?:\/\//i.test(url))
+    url = "https://" + url
+
+  return url
 }
 
 /**
@@ -90,19 +107,19 @@ function normalize(repo) {
  * @return {String}
  */
 
-function getUrl(repo, clone) {
-  var url;
+function getUrl (repo, clone) {
+  var url
 
   if (repo.type === "github")
-    url = github(repo, clone);
+    url = github(repo, clone)
   else if (repo.type === "gitlab")
-    url = gitlab(repo, clone);
+    url = gitlab(repo, clone)
   else if (repo.type === "bitbucket")
-    url = bitbucket(repo, clone);
+    url = bitbucket(repo, clone)
   else
-    url = github(repo, clone);
+    url = github(repo, clone)
 
-  return url;
+  return url
 }
 
 /**
@@ -112,15 +129,15 @@ function getUrl(repo, clone) {
  * @return {String}
  */
 
-function github(repo, clone) {
-  var url;
+function github (repo, clone) {
+  var url
 
   if (clone)
-    url = "git@" + repo.host + ":" + repo.owner + "/" + repo.name + ".git";
+    url = "git@" + repo.origin + ":" + repo.owner + "/" + repo.name + ".git"
   else
-    url = "https://" + repo.host + "/" + repo.owner + "/" + repo.name + "/archive/" + repo.checkout + ".zip";
+    url = addProtocol(repo.origin) + "/" + repo.owner + "/" + repo.name + "/archive/" + repo.checkout + ".zip"
 
-  return url;
+  return url
 }
 
 /**
@@ -130,15 +147,15 @@ function github(repo, clone) {
  * @return {String}
  */
 
-function gitlab(repo, clone) {
-  var url;
+function gitlab (repo, clone) {
+  var url
 
   if (clone)
-    url = "git@" + repo.host + ":" + repo.owner + "/" + repo.name + ".git";
+    url = "git@" + repo.origin + ":" + repo.owner + "/" + repo.name + ".git"
   else
-    url = "https://" + repo.host + "/" + repo.owner + "/" + repo.name + "/repository/archive.zip?ref=" + repo.checkout;
+    url = addProtocol(repo.origin) + "/" + repo.owner + "/" + repo.name + "/repository/archive.zip?ref=" + repo.checkout
 
-  return url;
+  return url
 }
 
 /**
@@ -148,13 +165,13 @@ function gitlab(repo, clone) {
  * @return {String}
  */
 
-function bitbucket(repo, clone) {
-  var url;
+function bitbucket (repo, clone) {
+  var url
 
   if (clone)
-    url = "git@" + repo.host + ":" + repo.owner + "/" + repo.name + ".git";
+    url = "git@" + repo.origin + ":" + repo.owner + "/" + repo.name + ".git"
   else
-    url = "https://" + repo.host + "/" + repo.owner + "/" + repo.name + "/get/" + repo.checkout + ".zip";
+    url = addProtocol(repo.origin) + "/" + repo.owner + "/" + repo.name + "/get/" + repo.checkout + ".zip"
 
-  return url;
+  return url
 }
