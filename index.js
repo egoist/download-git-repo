@@ -1,3 +1,4 @@
+var path = require("path");
 var Download = require("download");
 var gitclone = require("git-clone");
 var rm = require("rimraf").sync;
@@ -26,11 +27,14 @@ function download(repo, dest, opts, fn) {
 
   repo = normalize(repo);
   var url = getUrl(repo, clone);
+  
+  // Ensure dest directory is empty
+  rm(dest);
 
   if (clone) {
     gitclone(url, dest, { checkout: repo.checkout }, function(err) {
       if (err === undefined) {
-        rm(dest);
+        rm(path.join(dest, '.git'));
         fn();
       }
       else {
